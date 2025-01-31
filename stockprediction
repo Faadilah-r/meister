@@ -28,7 +28,7 @@ for i in range(30):
         # Reorder jika stok turun di bawah batas
         if stok_sekarang <= reorder_level[b]:
             stok_sekarang += reorder_jumlah[b]
-            print(f"📢 Reorder {b} dilakukan pada hari ke-{i+1}, tambah {reorder_jumlah[b]} unit!")
+            print(f" Reorder {b} dilakukan pada hari ke-{i+1}, tambah {reorder_jumlah[b]} unit!")
         
         df_stok.at[i, b] = stok_sekarang
 
@@ -61,7 +61,7 @@ rf_model.fit(X_train, y_train)
 
 # Prediksi reorder hari ke-31
 prediksi_reorder = rf_model.predict([[31, 20, 15]])
-print(f"📌 Apakah perlu reorder untuk '{barang_pilih}'? {'Ya' if prediksi_reorder[0] == 1 else 'Tidak'}")
+print(f" Apakah perlu reorder untuk '{barang_pilih}'? {'Ya' if prediksi_reorder[0] == 1 else 'Tidak'}")
 
 plt.figure(figsize=(12, 5))
 
