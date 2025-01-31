@@ -1,0 +1,88 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima.model import ARIMA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+barang = ["Susu", "Sikat Gigi", "Sabun", "Shampoo", "Roti", "Air Minum", "Minyak Goreng", "Beras", "Kopi", "Teh"]
+stok_awal = {b: 100 for b in barang}
+reorder_level = {b: 20 for b in barang}
+reorder_jumlah = {b: 50 for b in barang}  # Tambah stok jika mencapai reorder level
+
+# Simulasi penjualan harian selama 30 hari
+np.random.seed(42)
+penjualan_harian = {b: np.random.randint(2, 22, 30) for b in barang}
+
+df = pd.DataFrame(penjualan_harian)
+df["Hari"] = np.arange(1, 31)
+
+# Simpan stok tersisa setelah transaksi harian
+df_stok = pd.DataFrame(columns=barang)
+
+for i in range(30):
+    for b in barang:
+        stok_sebelumnya = stok_awal[b] if i == 0 else df_stok.at[i-1, b]
+        stok_sekarang = max(0, stok_sebelumnya - df.at[i, b])  # Hindari negatif
+        
+        # Reorder jika stok turun di bawah batas
+        if stok_sekarang <= reorder_level[b]:
+            stok_sekarang += reorder_jumlah[b]
+            print(f"📢 Reorder {b} dilakukan pada hari ke-{i+1}, tambah {reorder_jumlah[b]} unit!")
+        
+        df_stok.at[i, b] = stok_sekarang
+
+df_stok["Hari"] = np.arange(1, 31)
+
+barang_pilih = "Air Minum"
+model = ARIMA(df[barang_pilih], order=(5,1,0))
+model_fit = model.fit()
+prediksi = model_fit.forecast(steps=7)
+
+# Hitung kapan stok habis
+total_terjual = df[barang_pilih].sum() + prediksi.sum()
+prediksi_habis = len(df) + np.where(np.cumsum(prediksi) >= (stok_awal[barang_pilih] - df[barang_pilih].sum()))[0][0]
+
+print(f"📉 Berdasarkan prediksi, stok '{barang_pilih}' akan habis pada hari ke-{prediksi_habis}.")
+
+data = {
+    "Hari": df["Hari"],
+    "Penjualan": df[barang_pilih],
+    "Stok_Tersisa": df_stok[barang_pilih],
+    "Reorder": np.where(df_stok[barang_pilih] < reorder_level[barang_pilih], 1, 0)
+}
+df_prediksi = pd.DataFrame(data)
+
+X = df_prediksi[["Hari", "Penjualan", "Stok_Tersisa"]]
+y = df_prediksi["Reorder"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+
+# Prediksi reorder hari ke-31
+prediksi_reorder = rf_model.predict([[31, 20, 15]])
+print(f"📌 Apakah perlu reorder untuk '{barang_pilih}'? {'Ya' if prediksi_reorder[0] == 1 else 'Tidak'}")
+
+plt.figure(figsize=(12, 5))
+
+# Grafik stok harian
+plt.subplot(1, 2, 1)
+plt.plot(df["Hari"], df_stok[barang_pilih], marker="o", label="Stok Tersisa", color="blue")
+plt.axhline(y=20, color="red", linestyle="--", label="Batas Reorder")
+plt.axvline(x=prediksi_habis, color="purple", linestyle="--", label=f"Prediksi Stok Habis (Hari {prediksi_habis})")
+plt.xlabel("Hari")
+plt.ylabel("Stok Tersisa")
+plt.title(f" Tren Stok '{barang_pilih}'")
+plt.legend()
+
+# Grafik prediksi penjualan
+plt.subplot(1, 2, 2)
+plt.plot(df["Hari"], df[barang_pilih], label="Penjualan Aktual", color="green")
+plt.plot(np.arange(31, 38), prediksi, label="Prediksi Penjualan", linestyle="dashed", color="red")
+plt.xlabel("Hari")
+plt.ylabel("Jumlah Penjualan")
+plt.title(f" Prediksi Penjualan '{barang_pilih}' (ARIMA)")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
